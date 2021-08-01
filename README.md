@@ -1,2 +1,1 @@
-# psyland
-A psychic land
+# Psyland
