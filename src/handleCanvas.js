@@ -1,7 +1,7 @@
 import getCanvasDpr from './utils/getCanvasDpr'
 
 function handleCanvas(canvas, mainColor) {
-  const { PI, sin, cos, acos } = Math
+  const { PI, sin, cos, acos, atan2 } = Math
   const TAU = 2 * PI
 
   const _ = canvas.getContext('2d')
@@ -35,7 +35,7 @@ function handleCanvas(canvas, mainColor) {
 
   const upRight = {
     x: Math.sqrt(2) / 2,
-    y: Math.sqrt(2) / 2,
+    y: -Math.sqrt(2) / 2,
   }
 
   const amplitudeScaleFactor = 256
@@ -110,10 +110,10 @@ function handleCanvas(canvas, mainColor) {
       const t0 = i === 0 ? sinusoidal.cursor : 0
 
       for (let t = t0; t < period; t++) {
-        const p = rotateVector({
-          x: origin.x + waveLengthScaleFactor * (timeCursor + t - t0) / frequency,
-          y: origin.y + amplitudeScaleFactor * f(t),
-        }, angle)
+        const p = sumVectors(origin, rotateVector({
+          x: waveLengthScaleFactor * (timeCursor + t - t0) / frequency,
+          y: amplitudeScaleFactor * f(t),
+        }, angle))
 
         _.lineTo(p.x, p.y)
       }
@@ -221,7 +221,8 @@ function handleCanvas(canvas, mainColor) {
 
   // θ = arccos ( a.b / |a| . |b| )
   function getVectorsAngle(a, b) {
-    return acos((a.x * b.x + a.y * b.y) / (Math.sqrt(a.x * a.x + a.y * a.y) * Math.sqrt(b.x * b.x + b.y * b.y)))
+    return atan2(b.y, b.x) - atan2(a.y, a.x)
+    // return acos((a.x * b.x + a.y * b.y) / (Math.sqrt(a.x * a.x + a.y * a.y) * Math.sqrt(b.x * b.x + b.y * b.y)))
   }
 
   /* ---
