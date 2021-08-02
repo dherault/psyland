@@ -24,7 +24,7 @@ function handleCanvas(canvas, mainColor) {
   --- */
 
   const center = {
-    x: width / 2,
+    x: width / 4,
     y: height / 2,
   }
 
@@ -38,8 +38,13 @@ function handleCanvas(canvas, mainColor) {
     y: Math.sqrt(2) / 2,
   }
 
-  const amplitudeScaleFactor = 64
-  const waveLengthScaleFactor = 64 * 1024
+  const amplitudeScaleFactor = 256
+  const waveLengthScaleFactor = 1 / 64
+  const tickPeriod = 1000
+  const maxSegments = 4
+  const timeDilatation = 1 / 64
+  const tickSpeed = 1 / 16
+  const sinusoidalComplexity = 32
 
   const blue = '#2196f3'
 
@@ -51,13 +56,23 @@ function handleCanvas(canvas, mainColor) {
     Update
   --- */
 
+  let time = Date.now()
+
   function update() {
+    const now = Date.now()
+    const deltaTime = (now - time) * tickSpeed
+
+    time = now
+
     state.sinusoidals.forEach(sinusoidal => {
-      if (sinusoidal.cursor % sinusoidal.frequency === 0) {
-        sinusoidal.segments.unshift(1 / sinusoidal.frequency)
+      if (sinusoidal.cursor >= tickPeriod) {
+        sinusoidal.segments.shift()
+        sinusoidal.segments.push(createSinusoidalSegment(tickPeriod, sinusoidal.frequency))
+
+        sinusoidal.cursor = 0
       }
 
-      sinusoidal.cursor++
+      sinusoidal.cursor += deltaTime
     })
   }
 
@@ -69,7 +84,7 @@ function handleCanvas(canvas, mainColor) {
     _.clearRect(0, 0, width, height)
 
     drawCircle(center, 128)
-    drawSinusoidal(state.sinusoidals[0], center, upRight)
+    drawSinusoidal(state.sinusoidals[0], center, right)
   }
 
   function drawCircle(pos, radius, color = blue) {
@@ -83,48 +98,65 @@ function handleCanvas(canvas, mainColor) {
   function drawSinusoidal(sinusoidal, origin, direction, color = blue) {
     // const normalClockWise = rotateVector(direction, -PI / 2)
     const angle = getVectorsAngle(right, direction)
+    let timeCursor = 0
 
-    console.log('angle', angle * 360 / TAU)
-    const cursor = { ...origin }
+    _.strokeStyle = color
+    _.beginPath()
+    _.moveTo(origin.x, origin.y)
 
-    sinusoidal.segments.forEach(waveLength => {
-      const halfAdjustedAmplitude = sinusoidal.amplitude * amplitudeScaleFactor / 2
-      const quarterAdjustedWaveLength = waveLength * waveLengthScaleFactor / 4
+    sinusoidal.segments.forEach(({ period, frequency, nodes }, i) => {
+      const f = t => sinusoidal.amplitude / nodes.length * nodes.reduce((acc, node, n) => acc + node.coef * sin(n * t * timeDilatation + node.phase), 0)
 
-      const p1 = {
-        x: halfAdjustedAmplitude,
-        y: quarterAdjustedWaveLength,
+      const t0 = i === 0 ? sinusoidal.cursor : 0
+
+      for (let t = t0; t < period; t++) {
+        const p = rotateVector({
+          x: origin.x + waveLengthScaleFactor * (timeCursor + t - t0) / frequency,
+          y: origin.y + amplitudeScaleFactor * f(t),
+        }, angle)
+
+        _.lineTo(p.x, p.y)
       }
 
-      const p2 = {
-        x: 0,
-        y: 2 * quarterAdjustedWaveLength,
-      }
-
-      const p3 = {
-        x: -halfAdjustedAmplitude,
-        y: 3 * quarterAdjustedWaveLength,
-      }
-
-      const p4 = {
-        x: 0,
-        y: 4 * quarterAdjustedWaveLength,
-      }
+      timeCursor += period - t0
     })
 
-    // console.log('normasl', start)
+    _.stroke()
   }
 
   /* ---
     Data structures
   --- */
 
-  function createSinusoidal(frequency = 1024, amplitude = 1) {
-    return {
+  function createSinusoidal(frequency = 16 / tickPeriod, amplitude = 1) {
+    const sinusoidal = {
       amplitude,
       frequency,
       cursor: 0,
       segments: [],
+    }
+
+    for (let i = 0; i < maxSegments; i++) {
+      sinusoidal.segments.push(createSinusoidalSegment(tickPeriod, frequency))
+    }
+
+    return sinusoidal
+  }
+
+  function createSinusoidalSegment(period, frequency) {
+    const nodes = []
+
+    for (let i = 0; i < sinusoidalComplexity; i++) {
+      nodes.push({
+        coef: Math.random(),
+        phase: TAU * Math.random(),
+      })
+    }
+
+    return {
+      period,
+      frequency,
+      nodes,
     }
   }
 
@@ -154,18 +186,25 @@ function handleCanvas(canvas, mainColor) {
     return result
   }
 
-  function rotateVector(vector, angle) {
-    const matrix = multiplyMatrixes(
-      [
-        [cos(angle), -sin(angle)],
-        [sin(angle), cos(angle)],
-      ],
-      [[vector.x], [vector.y]]
-    )
+  // function rotateVector(vector, angle) {
+  //   const matrix = multiplyMatrixes(
+  //     [
+  //       [cos(angle), -sin(angle)],
+  //       [sin(angle), cos(angle)],
+  //     ],
+  //     [[vector.x], [vector.y]]
+  //   )
 
+  //   return {
+  //     x: matrix[0][0],
+  //     y: matrix[1][0],
+  //   }
+  // }
+
+  function rotateVector(vector, angle) {
     return {
-      x: matrix[0][0],
-      y: matrix[1][0],
+      x: vector.x * cos(angle) - vector.y * sin(angle),
+      y: vector.x * sin(angle) + vector.y * cos(angle),
     }
   }
 
